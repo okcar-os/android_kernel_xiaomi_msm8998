@@ -802,16 +802,19 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 
 	iface_no = ctx->data->cur_altsetting->desc.bInterfaceNumber;
 
-	/* Reset data interface. Some devices will not reset properly
-	 * unless they are configured first.  Toggle the altsetting to
-	 * force a reset
+	/*
+	 * The Accessory(Mercedes C260 2022) does not require this step, which if taken, could potentially lead to NCM failure
 	 */
-	usb_set_interface(dev->udev, iface_no, data_altsetting);
-	temp = usb_set_interface(dev->udev, iface_no, 0);
-	if (temp) {
-		dev_dbg(&intf->dev, "set interface failed\n");
-		goto error2;
-	}
+	// /* Reset data interface. Some devices will not reset properly
+	//  * unless they are configured first.  Toggle the altsetting to
+	//  * force a reset
+	//  */
+	// usb_set_interface(dev->udev, iface_no, data_altsetting);
+	// temp = usb_set_interface(dev->udev, iface_no, 0);
+	// if (temp) {
+	// 	dev_dbg(&intf->dev, "set interface failed\n");
+	// 	goto error2;
+	// }
 
 	/* initialize basic device settings */
 	if (cdc_ncm_init(dev))
@@ -862,9 +865,20 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 
 	cdc_ncm_find_endpoints(dev, ctx->data);
 	cdc_ncm_find_endpoints(dev, ctx->control);
-	if (!dev->in || !dev->out || !dev->status) {
-		dev_dbg(&intf->dev, "failed to collect endpoints\n");
+
+	/**
+	 * some Accessory(Mercedes C260 2022) did't have dev->status, should not call [goto error2] 
+	 */
+	// if (!dev->in || !dev->out || !dev->status) {
+	// 	dev_dbg(&intf->dev, "failed to collect endpoints\n");
+	// 	goto error2;
+	// }
+	if (!dev->in || !dev->out) {	
+		dev_info(&intf->dev, "failed to collect endpoints\n");
 		goto error2;
+	}
+	if (!dev->status) {
+		dev_info(&intf->dev, "failed to get status\n");
 	}
 
 	usb_set_intfdata(ctx->data, dev);
